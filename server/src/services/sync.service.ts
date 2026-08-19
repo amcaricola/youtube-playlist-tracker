@@ -1,7 +1,7 @@
 import { config } from '../config.js';
 import { storage } from './storage.service.js';
 import { checkVideosStatus } from './youtube.service.js';
-import type { Playlist, Track, TrackStatus } from '../types/index.js';
+import type { Playlist, Track } from '../types/index.js';
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 

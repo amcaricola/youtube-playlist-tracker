@@ -86,4 +86,10 @@ export const storage = {
   writePlaylists(data: PlaylistsFile): Promise<void> {
     return enqueue(() => writeJsonAtomic(config.files.playlists, data));
   },
+
+  async backupFile(name: string, content: string): Promise<void> {
+    ensureDataDir();
+    const fp = path.join(config.dataDir, name);
+    await fs.promises.writeFile(fp, content, 'utf-8');
+  },
 };

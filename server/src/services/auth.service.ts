@@ -65,7 +65,6 @@ export async function createSession(
   userAgent?: string,
   ip?: string,
 ): Promise<AuthResponse> {
-  const cfg = await storage.readConfig();
   const file = await storage.readSessions();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + config.sessionTtlDays * 24 * 60 * 60 * 1000);
@@ -113,8 +112,9 @@ export async function getSessionSummary(): Promise<{ count: number; expiresAt: s
   const file = await storage.readSessions();
   const active = purgeExpired(file.sessions);
   if (active.length === 0) return { count: 0, expiresAt: null };
-  const soonest = active.reduce((min, s) =>
-    new Date(s.expiresAt).getTime() < new Date(min).getTime() ? s : min,
+  const soonest = active.reduce<Session>(
+    (min, s) => (new Date(s.expiresAt).getTime() < new Date(min.expiresAt).getTime() ? s : min),
+    active[0],
   );
   return { count: active.length, expiresAt: soonest.expiresAt };
 }

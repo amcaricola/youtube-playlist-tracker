@@ -78,6 +78,9 @@ export const api = {
   post<T>(path: string, body?: unknown): Promise<ApiEnvelope<T>> {
     return request<T>(path, { method: 'POST', body });
   },
+  patch<T>(path: string, body?: unknown): Promise<ApiEnvelope<T>> {
+    return request<T>(path, { method: 'PATCH', body });
+  },
   delete<T>(path: string): Promise<ApiEnvelope<T>> {
     return request<T>(path, { method: 'DELETE' });
   },

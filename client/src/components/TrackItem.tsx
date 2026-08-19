@@ -1,8 +1,14 @@
+import { isGenericPlaceholder } from './trackUtils';
 import type { Track, TrackStatus } from '../types';
 
 interface Props {
   track: Track;
+  selected: boolean;
+  isDuplicate: boolean;
+  onToggleSelect: () => void;
   onRecover: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
 const STATUS_META: Record<TrackStatus, { label: string; classes: string }> = {
@@ -13,28 +19,31 @@ const STATUS_META: Record<TrackStatus, { label: string; classes: string }> = {
   unknown: { label: 'Sin verificar', classes: 'bg-gray-800 text-gray-400' },
 };
 
-function formatDate(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
 function watchUrl(videoId: string): string {
   return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
-export default function TrackItem({ track, onRecover }: Props) {
+export default function TrackItem({ track, selected, isDuplicate, onToggleSelect, onRecover, onEdit, onDelete }: Props) {
   const meta = STATUS_META[track.status] ?? STATUS_META.unknown;
   const damaged = track.status === 'deleted' || track.status === 'unavailable';
 
   return (
     <li
       class={`group flex items-center gap-3 rounded-xl border p-3 transition ${
-        damaged
-          ? 'border-red-900/50 bg-red-950/20 hover:bg-red-950/30'
-          : 'border-surface-800 bg-surface-900 hover:bg-surface-850'
+        selected
+          ? 'border-red-600/60 bg-surface-850'
+          : damaged
+            ? 'border-red-900/50 bg-red-950/20 hover:bg-red-950/30'
+            : 'border-surface-800 bg-surface-900 hover:bg-surface-850'
       }`}
     >
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={onToggleSelect}
+        title="Seleccionar para edición masiva"
+        class="h-4 w-4 shrink-0 cursor-pointer accent-red-600"
+      />
       <div class="relative shrink-0">
         {track.thumbnailUrl ? (
           <img
@@ -67,30 +76,55 @@ export default function TrackItem({ track, onRecover }: Props) {
           ) : null}
           {track.title}
         </p>
-        <p class="truncate text-xs text-gray-500">
-          Revisada: {formatDate(track.lastCheckedAt)}
-          {track.channelTitle ? ` · ${track.channelTitle}` : ''}
-        </p>
+        {track.channelTitle ? <p class="truncate text-xs text-gray-500">{track.channelTitle}</p> : null}
       </div>
 
       <div class="flex shrink-0 flex-col items-end gap-2">
-        <span class={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${meta.classes}`}>{meta.label}</span>
-        {damaged && (
+        <div class="flex items-center gap-1.5">
+          {isDuplicate && (
+            <span
+              class="rounded-full bg-orange-950/60 px-2.5 py-0.5 text-[11px] font-medium text-orange-300"
+              title="Hay otra canción con el mismo título (posible cover o duplicado)"
+            >
+              Duplicada
+            </span>
+          )}
+          <span class={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${meta.classes}`}>{meta.label}</span>
+        </div>
+        <div class="flex gap-1.5">
           <button
-            onClick={onRecover}
-            class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-500"
+            onClick={onEdit}
+            title="Editar artista / título"
+            class="rounded-lg border border-surface-700 bg-surface-800 px-2.5 py-1.5 text-xs font-medium text-gray-200 transition hover:bg-surface-700"
           >
-            Recuperar canción
+            ✏️
           </button>
-        )}
-        {track.status === 'unknown' && (
-          <button
-            onClick={onRecover}
-            class="rounded-lg border border-surface-700 bg-surface-800 px-3 py-1.5 text-xs font-medium text-gray-200 transition hover:bg-surface-700"
-          >
-            Verificar
-          </button>
-        )}
+          {damaged && (
+            <button
+              onClick={onRecover}
+              class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-500"
+            >
+              Recuperar
+            </button>
+          )}
+          {track.status === 'unknown' && (
+            <button
+              onClick={onRecover}
+              class="rounded-lg border border-surface-700 bg-surface-800 px-3 py-1.5 text-xs font-medium text-gray-200 transition hover:bg-surface-700"
+            >
+              Verificar
+            </button>
+          )}
+          {damaged && isGenericPlaceholder(track) && (
+            <button
+              onClick={onDelete}
+              title="Eliminar de la playlist de YouTube (no se puede recuperar)"
+              class="rounded-lg border border-red-900/50 bg-red-950/40 px-2.5 py-1.5 text-xs font-medium text-red-300 transition hover:bg-red-950/70"
+            >
+              🗑
+            </button>
+          )}
+        </div>
       </div>
     </li>
   );

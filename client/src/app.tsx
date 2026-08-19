@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Toaster from './components/Toaster';
+import Footer from './components/Footer';
 import { api, clearAuth, getToken, isTokenExpired } from './services/api';
 import type { SessionSummary } from './types';
 
@@ -37,6 +38,7 @@ export default function App() {
     <>
       <Toaster />
       {authed ? <Dashboard onLogout={() => setAuthed(false)} /> : <Login onLogin={() => setAuthed(true)} />}
+      <Footer />
     </>
   );
 }

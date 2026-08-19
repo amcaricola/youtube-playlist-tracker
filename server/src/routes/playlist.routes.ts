@@ -1,14 +1,26 @@
 import { Hono } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { requireAuth } from '../middleware/auth.js';
 import {
+  bulkUpdateTracks,
   deletePlaylist,
+  importBackup,
   importPlaylist,
   listPlaylists,
   refreshPlaylistStatus,
+  removeDamagedTracks,
+  removeTrackFromPlaylist,
   replaceTrack,
+  syncStructure,
+  updateTrack,
 } from '../services/playlist.service.js';
 
 const playlistRoutes = new Hono();
+
+function errStatus(err: unknown): ContentfulStatusCode {
+  const code = err instanceof Error && 'statusCode' in err ? (err as { statusCode: number }).statusCode : 500;
+  return code as ContentfulStatusCode;
+}
 
 playlistRoutes.use('*', requireAuth);
 
@@ -32,8 +44,36 @@ playlistRoutes.post('/import', async (c) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error al importar la playlist.';
-    const status = err instanceof Error && 'statusCode' in err ? (err as { statusCode: number }).statusCode : 500;
-    return c.json({ success: false, error: message }, status);
+    return c.json({ success: false, error: message }, errStatus(err));
+  }
+});
+
+playlistRoutes.get('/export', async (_c) => {
+  const file = await listPlaylists();
+  const filename = `playlists-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  return new Response(JSON.stringify({ exportedAt: new Date().toISOString(), playlists: file }, null, 2), {
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+  });
+});
+
+playlistRoutes.post('/import-backup', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  if (!body || typeof body.file !== 'string' || !body.file.trim()) {
+    return c.json({ success: false, error: 'Envía el contenido del backup (JSON) en el campo "file".' }, 400);
+  }
+  try {
+    const result = await importBackup(body.file);
+    return c.json({
+      success: true,
+      data: result,
+      message: `Backup restaurado: ${result.playlists} playlists con ${result.tracks} canciones. Se creó una copia de seguridad de los datos previos.`,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error al importar el backup.';
+    return c.json({ success: false, error: message }, errStatus(err));
   }
 });
 
@@ -43,8 +83,24 @@ playlistRoutes.delete('/:id', async (c) => {
     return c.json({ success: true, message: 'Playlist eliminada de la app.' });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error al eliminar.';
-    const status = err instanceof Error && 'statusCode' in err ? (err as { statusCode: number }).statusCode : 500;
-    return c.json({ success: false, error: message }, status);
+    return c.json({ success: false, error: message }, errStatus(err));
+  }
+});
+
+playlistRoutes.post('/:id/sync-structure', async (c) => {
+  try {
+    const result = await syncStructure(c.req.param('id'));
+    return c.json({
+      success: true,
+      data: result,
+      message:
+        result.added > 0
+          ? `Estructura sincronizada: ${result.added} canciones nuevas importadas.`
+          : 'La estructura está al día, no hay canciones nuevas.',
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error al sincronizar la estructura.';
+    return c.json({ success: false, error: message }, errStatus(err));
   }
 });
 
@@ -59,8 +115,7 @@ playlistRoutes.post('/:id/sync', async (c) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error al sincronizar.';
-    const status = err instanceof Error && 'statusCode' in err ? (err as { statusCode: number }).statusCode : 500;
-    return c.json({ success: false, error: message }, status);
+    return c.json({ success: false, error: message }, errStatus(err));
   }
 });
 
@@ -81,8 +136,67 @@ playlistRoutes.post('/replace-track', async (c) => {
     return c.json({ success: true, data: track, message: 'Canción reemplazada con éxito.' });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error al reemplazar la canción.';
-    const status = err instanceof Error && 'statusCode' in err ? (err as { statusCode: number }).statusCode : 500;
-    return c.json({ success: false, error: message }, status);
+    return c.json({ success: false, error: message }, errStatus(err));
+  }
+});
+
+playlistRoutes.post('/:id/tracks/bulk', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    trackIds?: string[];
+    title?: string;
+    artist?: string;
+  };
+  try {
+    const updated = await bulkUpdateTracks(c.req.param('id'), body.trackIds ?? [], {
+      title: body.title,
+      artist: body.artist,
+    });
+    return c.json({ success: true, data: { updated }, message: `${updated} canciones actualizadas.` });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error al actualizar.';
+    return c.json({ success: false, error: message }, errStatus(err));
+  }
+});
+
+playlistRoutes.delete('/:id/tracks/:trackId', async (c) => {
+  try {
+    const track = await removeTrackFromPlaylist(c.req.param('id'), c.req.param('trackId'));
+    return c.json({
+      success: true,
+      data: { trackId: track.id },
+      message: 'Canción eliminada de tu playlist de YouTube y del registro local.',
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error al eliminar la canción.';
+    return c.json({ success: false, error: message }, errStatus(err));
+  }
+});
+
+playlistRoutes.post('/:id/remove-damaged', async (c) => {
+  try {
+    const removed = await removeDamagedTracks(c.req.param('id'));
+    return c.json({
+      success: true,
+      data: { removed },
+      message: `${removed} canciones dañadas eliminadas de tu playlist de YouTube.`,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error al eliminar las dañadas.';
+    return c.json({ success: false, error: message }, errStatus(err));
+  }
+});
+
+playlistRoutes.patch('/:id/tracks/:trackId', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { title?: string; artist?: string };
+  if (body.title === undefined && body.artist === undefined) {
+    return c.json({ success: false, error: 'Envía "title" o "artist" para editar.' }, 400);
+  }
+  try {
+    const track = await updateTrack(c.req.param('id'), c.req.param('trackId'), body);
+    return c.json({ success: true, data: track, message: 'Datos actualizados.' });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error al actualizar.';
+    return c.json({ success: false, error: message }, errStatus(err));
   }
 });
 

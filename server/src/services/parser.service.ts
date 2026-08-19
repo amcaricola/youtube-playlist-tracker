@@ -1,4 +1,5 @@
 const SUFFIX_PATTERNS = [
+  /(?:\(|\[)\s*official\s+[^)\]]*(?:\)|\])/gi,
   /\(official\s+(lyric\s+|video\s+|audio\s+|visualizer\s+)?(video|audio|lyrics|visualizer|music video)\)/gi,
   /\[official\s+(lyric\s+|video\s+|audio\s+|visualizer\s+)?(video|audio|lyrics|visualizer|music video)\]/gi,
   /\(official\s+hd\)|\[official\s+hd\]/gi,
@@ -13,6 +14,7 @@ const SUFFIX_PATTERNS = [
   /\(with\s+lyrics\)|\[with\s+lyrics\]/gi,
   /\(feat\.?\s+.*?\)/gi,
   /\[feat\.?\s+.*?\]/gi,
+  /\s*[|｜][^|｜]*$/gi,
 ];
 
 function stripSuffixes(title: string): string {
@@ -20,8 +22,7 @@ function stripSuffixes(title: string): string {
   for (const pattern of SUFFIX_PATTERNS) {
     cleaned = cleaned.replace(pattern, '');
   }
-  cleaned = cleaned.replace(/[｜|]\s*$/g, '').trim();
-  return cleaned;
+  return cleaned.trim();
 }
 
 function splitArtistTitle(title: string): { artist: string; track: string } | null {

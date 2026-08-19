@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import { api, clearAuth } from '../services/api';
 import { showToast } from './Toaster';
 import type { OAuthStatus, SessionSummary } from '../types';
@@ -35,7 +35,18 @@ export default function SessionManager({ oauth, session, onOpenOAuth, onDisconne
         <span class="inline-flex items-center gap-2 rounded-lg border border-emerald-900/60 bg-emerald-950/40 px-3 py-1.5 text-xs text-emerald-300">
           <span class="h-2 w-2 rounded-full bg-emerald-400" />
           YouTube: {oauth.channelTitle ?? 'conectado'}
-          <button onClick={onDisconnectOAuth} class="ml-1 text-emerald-400 underline-offset-2 hover:underline">
+          <button
+            onClick={() => {
+              if (
+                window.confirm(
+                  '¿Desconectar YouTube? El acceso (token) se revocará también en Google. Los datos guardados en la app se conservan.',
+                )
+              ) {
+                onDisconnectOAuth();
+              }
+            }}
+            class="ml-1 text-emerald-400 underline-offset-2 hover:underline"
+          >
             desconectar
           </button>
         </span>

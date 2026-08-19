@@ -15,19 +15,6 @@ export class YouTubeError extends Error {
   }
 }
 
-interface GoogleApiErrorBody {
-  error?: {
-    code?: number;
-    message?: string;
-    errors?: Array<{
-      reason?: string;
-      domain?: string;
-      location?: string;
-      message?: string;
-    }>;
-  };
-}
-
 interface OAuthTokenResponse {
   access_token?: string;
   refresh_token?: string;
@@ -42,13 +29,6 @@ function buildQuery(params: Record<string, string | number | undefined>): string
     if (value !== undefined && value !== '') usp.set(key, String(value));
   }
   return usp.toString();
-}
-
-function getApiKeyOrThrow(): string {
-  if (!config.youtubeApiKey) {
-    throw new YouTubeError('YOUTUBE_API_KEY no configurada en .env', 500);
-  }
-  return config.youtubeApiKey;
 }
 
 async function getAccessToken(): Promise<string> {
@@ -96,6 +76,25 @@ interface ApiResponseJson {
   error?: { code?: number; message?: string; errors?: Array<{ reason?: string; location?: string }> };
 }
 
+async function getReadHeaders(): Promise<Record<string, string>> {
+  const cfg = await storage.readConfig();
+  if (cfg.oauth.connected && cfg.oauth.refreshToken) {
+    try {
+      const token = await getAccessToken();
+      return { Authorization: `Bearer ${token}` };
+    } catch (err) {
+      console.warn('[youtube] OAuth no disponible para lectura, se intenta con API key:', (err as Error).message);
+    }
+  }
+  if (config.youtubeApiKey) {
+    return { 'X-goog-api-key': config.youtubeApiKey };
+  }
+  throw new YouTubeError(
+    'Sin credenciales de YouTube: configura YOUTUBE_API_KEY o conecta tu cuenta con OAuth desde la web.',
+    500,
+  );
+}
+
 async function apiFetch(
   path: string,
   params: Record<string, string | number | undefined>,
@@ -107,7 +106,7 @@ async function apiFetch(
   if (useOAuth) {
     headers.Authorization = `Bearer ${await getAccessToken()}`;
   } else {
-    headers['X-goog-api-key'] = getApiKeyOrThrow();
+    Object.assign(headers, await getReadHeaders());
   }
   const res = await fetch(url, { headers });
   const json = (await res.json()) as ApiResponseJson & Record<string, unknown>;
@@ -123,6 +122,12 @@ async function apiFetch(
 /* ------------------------------------------------------------------ */
 
 export function getOAuthUrl(state: string): string {
+  if (!config.oauth.clientId || !config.oauth.clientSecret) {
+    throw new YouTubeError(
+      'OAuth no configurado: define YOUTUBE_OAUTH_CLIENT_ID y YOUTUBE_OAUTH_CLIENT_SECRET en server/.env',
+      500,
+    );
+  }
   const params = new URLSearchParams({
     client_id: config.oauth.clientId,
     redirect_uri: config.oauth.redirectUri,
@@ -199,6 +204,22 @@ export async function getOAuthStatus(): Promise<{
 
 export async function disconnectOAuth(): Promise<void> {
   const cfg = await storage.readConfig();
+
+  if (cfg.oauth.refreshToken) {
+    try {
+      const res = await fetch('https://oauth2.googleapis.com/revoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ token: cfg.oauth.refreshToken }),
+      });
+      if (!res.ok) {
+        console.warn('[disconnectOAuth] No se pudo revocar el token en Google (HTTP', res.status, ').');
+      }
+    } catch (err) {
+      console.warn('[disconnectOAuth] Error al revocar el token en Google:', (err as Error).message);
+    }
+  }
+
   await storage.writeConfig({
     ...cfg,
     oauth: {
@@ -210,6 +231,13 @@ export async function disconnectOAuth(): Promise<void> {
       channelTitle: null,
     },
   });
+}
+
+export async function ensureOAuthConnected(): Promise<void> {
+  const cfg = await storage.readConfig();
+  if (!cfg.oauth.connected || !cfg.oauth.refreshToken) {
+    throw new YouTubeError('OAuth de YouTube no conectado. Conecta tu cuenta para modificar la playlist.', 401);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -226,17 +254,19 @@ export async function fetchPlaylistMeta(playlistId: string): Promise<{
   itemCount: number;
 }> {
   const json = await apiFetch('playlists', { part: 'snippet,contentDetails', id: playlistId }, false);
-  const item = (json.items?.[0] as {
-    id?: string;
-    snippet?: {
-      title?: string;
-      description?: string;
-      channelId?: string;
-      channelTitle?: string;
-      thumbnails?: { high?: { url?: string }; default?: { url?: string } };
-    };
-    contentDetails?: { itemCount?: number };
-  }) | undefined;
+  const item = json.items?.[0] as
+    | {
+        id?: string;
+        snippet?: {
+          title?: string;
+          description?: string;
+          channelId?: string;
+          channelTitle?: string;
+          thumbnails?: { high?: { url?: string }; default?: { url?: string } };
+        };
+        contentDetails?: { itemCount?: number };
+      }
+    | undefined;
   if (!item?.id) {
     throw new YouTubeError('Playlist no encontrada. Verifica la URL o el ID.', 404);
   }

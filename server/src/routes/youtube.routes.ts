@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import crypto from 'node:crypto';
 import { requireAuth } from '../middleware/auth.js';
-import { config } from '../config.js';
 import {
   disconnectOAuth,
   exchangeCode,
@@ -13,8 +12,30 @@ import {
 const youtubeRoutes = new Hono();
 
 const pendingStates = new Map<string, { createdAt: number }>();
+const STATE_TTL_MS = 10 * 60 * 1000;
+
+function pruneStates(): void {
+  const cutoff = Date.now() - STATE_TTL_MS;
+  for (const [key, value] of pendingStates) {
+    if (value.createdAt < cutoff) pendingStates.delete(key);
+  }
+}
+
+function oauthCompleteHtml(status: string): string {
+  return (
+    '<!doctype html><html lang="es"><head><meta charset="utf-8">' +
+    '<title>YouTube OAuth</title></head><body style="background:#0a0a0f;color:#d1d5db;font-family:system-ui;' +
+    'display:grid;place-items:center;height:100vh"><p>OAuth ' +
+    status +
+    '. Puedes cerrar esta ventana.</p>' +
+    '<script>if(window.opener){window.opener.postMessage({type:"YPT_OAUTH",status:"' +
+    status +
+    '"}, "*");}window.close();</script></body></html>'
+  );
+}
 
 youtubeRoutes.get('/oauth/url', requireAuth, async (c) => {
+  pruneStates();
   const state = crypto.randomBytes(16).toString('hex');
   pendingStates.set(state, { createdAt: Date.now() });
   const url = getOAuthUrl(state);
@@ -27,19 +48,19 @@ youtubeRoutes.get('/oauth/callback', async (c) => {
   const error = c.req.query('error');
 
   if (error || !code) {
-    return c.redirect(`${config.clientUrl}/settings?oauth=error`);
+    return c.html(oauthCompleteHtml('error'));
   }
   if (!state || !pendingStates.has(state)) {
-    return c.redirect(`${config.clientUrl}/settings?oauth=invalid`);
+    return c.html(oauthCompleteHtml('invalid'));
   }
   pendingStates.delete(state);
 
   try {
-    const channel = await exchangeCode(code);
-    return c.redirect(`${config.clientUrl}/settings?oauth=connected`);
+    await exchangeCode(code);
+    return c.html(oauthCompleteHtml('connected'));
   } catch (err) {
     console.error('[oauth] Error al intercambiar el código:', err);
-    return c.redirect(`${config.clientUrl}/settings?oauth=failed`);
+    return c.html(oauthCompleteHtml('failed'));
   }
 });
 

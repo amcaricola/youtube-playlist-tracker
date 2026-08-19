@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api } from '../services/api';
 import { buildSearchQuery } from './queryUtils';
+import { isGenericPlaceholder } from './trackUtils';
 import type { SearchResult, Track } from '../types';
 
 interface Props {
@@ -11,7 +12,8 @@ interface Props {
 }
 
 export default function RecoveryModal({ track, playlistId, onClose, onReplaced }: Props) {
-  const [query, setQuery] = useState(() => buildSearchQuery(track.artist, track.title));
+  const noData = isGenericPlaceholder(track);
+  const [query, setQuery] = useState(() => (noData ? '' : buildSearchQuery(track.artist, track.title)));
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,8 +43,10 @@ export default function RecoveryModal({ track, playlistId, onClose, onReplaced }
   };
 
   useEffect(() => {
-    void doSearch(buildSearchQuery(track.artist, track.title));
-  }, [track]);
+    if (!noData) {
+      void doSearch(buildSearchQuery(track.artist, track.title));
+    }
+  }, [track, noData]);
 
   const replace = async (result: SearchResult) => {
     setReplacing(result.videoId);
@@ -97,6 +101,13 @@ export default function RecoveryModal({ track, playlistId, onClose, onReplaced }
             {loading ? 'Buscando…' : 'Buscar'}
           </button>
         </div>
+
+        {noData && (
+          <div class="mb-4 rounded-lg border border-amber-900/50 bg-amber-950/30 px-3 py-2.5 text-sm text-amber-200">
+            Esta canción se perdió antes de importar la playlist, por eso YouTube no conservó su título.
+            Escribe el artista/canción en el buscador, o ciérrala y usa <b>✏️</b> para guardar sus datos.
+          </div>
+        )}
 
         {error && (
           <div class="mb-3 rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300">
