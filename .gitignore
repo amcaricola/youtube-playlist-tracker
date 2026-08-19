@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Server runtime data (secret: passwords, tokens, playlists)
+server/data/
+server/.env
+
+# Client env
+client/.env
+client/.env.local
+
+# Misc
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
