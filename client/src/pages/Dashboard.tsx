@@ -464,14 +464,14 @@ export default function Dashboard({ onLogout }: Props) {
                       title="Detecta canciones nuevas añadidas directamente en YouTube y las importa sin pisar tus datos"
                       class="rounded-lg border border-surface-700 bg-surface-800 px-4 py-2 text-sm font-medium text-gray-200 transition hover:bg-surface-700 disabled:opacity-60"
                     >
-                      {syncingStructure ? 'Sincronizando…' : 'Sincronizar estructura'}
+                      {syncingStructure ? 'Sincronizando…' : 'Sincronizar playlist'}
                     </button>
                     <button
                       onClick={() => void syncPlaylist(true)}
                       disabled={syncing}
                       class="rounded-lg border border-surface-700 bg-surface-800 px-4 py-2 text-sm font-medium text-gray-200 transition hover:bg-surface-700 disabled:opacity-60"
                     >
-                      {syncing ? 'Verificando…' : 'Verificar ahora'}
+                      {syncing ? 'Verificando…' : 'Verificar estados'}
                     </button>
                     {lostCount > 0 && (
                       <button

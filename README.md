@@ -32,14 +32,14 @@ cp .env.example server/.env
 
 2. Variables:
 
-| Variable | Descripción |
-| :--- | :--- |
-| `MASTER_PASSWORD` | Contraseña maestra del Super Usuario (se hashea con sal en el primer arranque). |
-| `YOUTUBE_API_KEY` | Clave de API para lectura pública (playlists, videos, búsqueda). Opcional si usas OAuth. |
-| `YOUTUBE_OAUTH_CLIENT_ID` / `YOUTUBE_OAUTH_CLIENT_SECRET` | Credenciales OAuth para modificar playlists (Google Cloud Console). |
-| `YOUTUBE_OAUTH_REDIRECT_URI` | Debe coincidir con la URI autorizada en Google Cloud. |
+| Variable                                                  | Descripción                                                                              |
+| :-------------------------------------------------------- | :--------------------------------------------------------------------------------------- |
+| `MASTER_PASSWORD`                                         | Contraseña maestra del Super Usuario (se hashea con sal en el primer arranque).          |
+| `YOUTUBE_API_KEY`                                         | Clave de API para lectura pública (playlists, videos, búsqueda). Opcional si usas OAuth. |
+| `YOUTUBE_OAUTH_CLIENT_ID` / `YOUTUBE_OAUTH_CLIENT_SECRET` | Credenciales OAuth para modificar playlists (Google Cloud Console).                      |
+| `YOUTUBE_OAUTH_REDIRECT_URI`                              | Debe coincidir con la URI autorizada en Google Cloud.                                    |
 
-3. En **Google Cloud Console**: habilita **YouTube Data API v3**, crea una API Key y unas credenciales **OAuth Client** (Web application) con la URI de redirección apuntando a `http://localhost:3000/api/youtube/oauth/callback`. En OAuth consentscreen usa el modo *Testing* (hasta 100 usuarios) o publica la app para más.
+3. En **Google Cloud Console**: habilita **YouTube Data API v3**, crea una API Key y unas credenciales **OAuth Client** (Web application) con la URI de redirección apuntando a `http://localhost:3000/api/youtube/oauth/callback`. En OAuth consentscreen usa el modo _Testing_ (hasta 100 usuarios) o publica la app para más.
 
 ## Uso en desarrollo
 
@@ -58,6 +58,28 @@ npm run start          # arranca el servidor de producción
 
 El servidor sirve la web construida en `client/dist` desde la raíz `/`, además de la API (`/api/*`).
 
+## Despliegue con Dockploy (desde GitHub)
+
+Dockploy recupera el repositorio desde GitHub y se encarga de construir la app. Para que el servidor arranque **solo después** de que termine el build, encadena los comandos con `&&` en la configuración de build/start:
+
+```
+npm run build && npm start
+```
+
+- `&&` es **secuencial**: `npm start` solo se ejecuta si `npm run build` terminó correctamente.
+- **No uses `&` ni un `sleep`**: el `&` lanza ambos a la vez y el servidor leería `dist/` mientras se está escribiendo (archivos incompletos, errores de import). Con `&&` no necesitas ningún delay.
+
+Variables de entorno a definir en Dockploy:
+
+| Variable                                                  | Descripción                                                                                         |
+| :-------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- |
+| `MASTER_PASSWORD`                                         | Contraseña maestra (se hashea en el primer arranque).                                               |
+| `YOUTUBE_API_KEY`                                         | Clave de API para lecturas (opcional si usas OAuth).                                                |
+| `YOUTUBE_OAUTH_CLIENT_ID` / `YOUTUBE_OAUTH_CLIENT_SECRET` | Credenciales OAuth.                                                                                 |
+| `YOUTUBE_OAUTH_REDIRECT_URI`                              | Tu dominio público + `/api/youtube/oauth/callback` (debe estar autorizada en Google Cloud Console). |
+
+**Volumen persistente**: los datos viven en `server/data/` (`config.json`, `sessions.json`, `playlists.json`). Monta un volumen en esa ruta dentro del contenedor para no perderlos al recrear la app.
+
 ## Flujo de uso
 
 1. Entra con la contraseña maestra → recibes un token de sesión de 30 días.
@@ -72,26 +94,31 @@ El servidor sirve la web construida en `client/dist` desde la raíz `/`, además
 ## Funcionalidades principales
 
 ### Gestión de datos
+
 - **Importar playlist** por URL o ID (parsing automático de `Artista - Título` con limpieza de sufijos tipo `(Official Video)`, `[Audio]`, `feat.`, etc.).
 - **Edición de datos propios** por canción (✏️): corregir artista/título cuando el parsing no sea perfecto o YouTube devuelva títulos genéricos.
 - **Edición masiva de artista**: selecciona canciones (checkboxes + "Seleccionar esta página"), escribe el artista y aplica — ideal para unificar variantes del mismo artista ("Metalica", "Metallica band", etc.).
 - **Detección de duplicados**: badge naranja "Duplicada" cuando hay otra canción con el mismo título normalizado (posibles covers), con filtro **"Solo duplicadas"** para revisarlas juntas.
 
 ### Monitoreo y recuperación
+
 - Verificación de estado por lotes: `active`, `unavailable`, `private`, `deleted`, `unknown`.
 - **Recuperación/reemplazo** de canciones dañadas: búsqueda en YouTube con los datos guardados (`"Artista - Título"`), selección del mejor candidato e inserción/eliminación en la playlist real vía OAuth.
 - **Borrado seguro**: el botón 🗑 y la acción masiva "Eliminar N sin datos" solo aplican a canciones dañadas sin información guardada (irrecuperables); las recuperables solo muestran "Recuperar"/editar para evitar borrados accidentales.
 
 ### Filtros y UI
+
 - Búsqueda reactiva por canción o artista; autocompletado de artistas (3 sugerencias) con botón de limpieza.
 - Filtros: **"Solo dañadas"** y **"Solo duplicadas"**.
 - Paginación de 100 canciones; hover en cada fila para reproducir en YouTube (▶).
 
 ### Backup y datos
+
 - **⬇ Backup**: descarga el JSON completo con todos los metadatos preservados.
 - **⬆ Restaurar**: sube un backup para recuperar los datos; antes de sobrescribir se guarda automáticamente una copia previa (`playlists.json.bak-<timestamp>`).
 
 ### Seguridad
+
 - Una sola contraseña maestra, almacenada como hash con sal (scrypt).
 - Tokens de sesión de 30 días (hash en `sessions.json`), revocables con **"Block All Sessions"**.
 - **Anti fuerza bruta**: tras 5 intentos fallidos de contraseña, el login se bloquea 15 minutos (HTTP 429).
@@ -118,9 +145,9 @@ El detalle de fases y evolución del desarrollo está en `PLAN_DE_TRABAJO.MD`.
 
 ## Comandos útiles
 
-| Comando | Descripción |
-| :--- | :--- |
-| `npm run dev` | Desarrollo con hot-reload (backend 3000 + Vite 5173). |
-| `npm run build` | Compila server y client para producción. |
-| `npm run start` | Arranca el servidor de producción. |
-| `npm run typecheck` | Verificación de tipos en server y client. |
+| Comando             | Descripción                                           |
+| :------------------ | :---------------------------------------------------- |
+| `npm run dev`       | Desarrollo con hot-reload (backend 3000 + Vite 5173). |
+| `npm run build`     | Compila server y client para producción.              |
+| `npm run start`     | Arranca el servidor de producción.                    |
+| `npm run typecheck` | Verificación de tipos en server y client.             |
