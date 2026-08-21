@@ -30,7 +30,7 @@ export default function Login({ onLogin }: Props) {
     <div class="flex min-h-screen items-center justify-center bg-surface-950 px-4">
       <div class="w-full max-w-sm">
         <div class="mb-8 text-center">
-          <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-red-600/20 text-2xl">
+          <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600/20 text-2xl">
             🎵
           </div>
           <h1 class="text-2xl font-semibold text-white">YouTube Playlist Tracker</h1>
@@ -50,7 +50,7 @@ export default function Login({ onLogin }: Props) {
               placeholder="••••••••"
               autocomplete="current-password"
               required
-              class="w-full rounded-lg border border-surface-700 bg-surface-900 px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+              class="w-full rounded-lg border border-surface-700 bg-surface-900 px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
@@ -63,7 +63,7 @@ export default function Login({ onLogin }: Props) {
           <button
             type="submit"
             disabled={loading}
-            class="w-full rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+            class="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? 'Entrando…' : 'Entrar'}
           </button>

@@ -60,7 +60,7 @@ export default function EditTrackModal({ track, playlistId, onClose, onSaved }: 
               value={artist}
               onInput={(e) => setArtist((e.target as HTMLInputElement).value)}
               placeholder="Artista"
-              class="w-full rounded-lg border border-surface-700 bg-surface-850 px-3 py-2 text-sm text-white outline-none focus:border-red-500"
+              class="w-full rounded-lg border border-surface-700 bg-surface-850 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
             />
           </div>
           <div>
@@ -72,7 +72,7 @@ export default function EditTrackModal({ track, playlistId, onClose, onSaved }: 
               value={title}
               onInput={(e) => setTitle((e.target as HTMLInputElement).value)}
               placeholder="Título"
-              class="w-full rounded-lg border border-surface-700 bg-surface-850 px-3 py-2 text-sm text-white outline-none focus:border-red-500"
+              class="w-full rounded-lg border border-surface-700 bg-surface-850 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
             />
           </div>
         </div>
@@ -93,7 +93,7 @@ export default function EditTrackModal({ track, playlistId, onClose, onSaved }: 
           <button
             onClick={() => void save()}
             disabled={saving}
-            class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-60"
+            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
           >
             {saving ? 'Guardando…' : 'Guardar'}
           </button>

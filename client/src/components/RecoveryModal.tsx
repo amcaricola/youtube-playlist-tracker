@@ -91,12 +91,12 @@ export default function RecoveryModal({ track, playlistId, onClose, onReplaced }
             value={query}
             onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
             onKeyDown={(e) => e.key === 'Enter' && void doSearch(query)}
-            class="flex-1 rounded-lg border border-surface-700 bg-surface-850 px-3 py-2 text-sm text-white outline-none focus:border-red-500"
+            class="flex-1 rounded-lg border border-surface-700 bg-surface-850 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
           />
           <button
             onClick={() => void doSearch(query)}
             disabled={loading}
-            class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-60"
+            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
           >
             {loading ? 'Buscando…' : 'Buscar'}
           </button>

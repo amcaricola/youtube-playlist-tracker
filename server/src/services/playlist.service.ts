@@ -51,7 +51,6 @@ function buildTrack(item: {
     title: parsed.title || item.title,
     artist: parsed.artist,
     originalYoutubeTitle: item.title,
-    channelTitle: item.channelTitle,
     thumbnailUrl: item.thumbnailUrl,
     position: item.position,
     status: 'unknown' as TrackStatus,

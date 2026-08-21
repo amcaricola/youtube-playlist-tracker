@@ -5,13 +5,14 @@ import SearchAndFilters from '../components/SearchAndFilters';
 import TrackList from '../components/TrackList';
 import RecoveryModal from '../components/RecoveryModal';
 import EditTrackModal from '../components/EditTrackModal';
+import ImportModal from '../components/ImportModal';
 import Pagination from '../components/Pagination';
 import { api, clearAuth, getToken } from '../services/api';
 import { showToast } from '../components/Toaster';
 import { isDamaged, isGenericPlaceholder, normalizeTitle } from '../components/trackUtils';
 import type { OAuthStatus, Playlist, SessionSummary, Track } from '../types';
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 50;
 
 interface Props {
   onLogout: () => void;
@@ -21,14 +22,16 @@ export default function Dashboard({ onLogout }: Props) {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncingStructure, setSyncingStructure] = useState(false);
   const [query, setQuery] = useState('');
   const [artistFilter, setArtistFilter] = useState('');
   const [damagedOnly, setDamagedOnly] = useState(false);
   const [duplicatesOnly, setDuplicatesOnly] = useState(false);
+  const [sortKey, setSortKey] = useState<'none' | 'title' | 'artist'>('none');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
   const [bulkArtist, setBulkArtist] = useState('');
@@ -107,30 +110,54 @@ export default function Dashboard({ onLogout }: Props) {
   const duplicateIds = useMemo(() => {
     if (!selected) return new Set<string>();
     const counts = new Map<string, number>();
+    const keyOf = (t: Track) => `${normalizeTitle(t.title)}|${normalizeTitle(t.artist)}`;
     for (const t of selected.tracks) {
-      const key = normalizeTitle(t.title);
-      if (!key) continue;
+      if (isGenericPlaceholder(t)) continue;
+      const key = keyOf(t);
+      if (!normalizeTitle(t.title)) continue;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     const dup = new Set<string>();
     for (const t of selected.tracks) {
-      const key = normalizeTitle(t.title);
+      const key = keyOf(t);
       if (key && (counts.get(key) ?? 0) > 1) dup.add(t.id);
     }
     return dup;
   }, [selected]);
 
+  const toggleSort = (key: 'title' | 'artist') => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir('asc');
+    } else if (sortDir === 'asc') {
+      setSortDir('desc');
+    } else {
+      setSortKey('none');
+      setSortDir('asc');
+    }
+  };
+
   const filteredTracks = useMemo(() => {
     if (!selected) return [];
     const q = query.trim().toLowerCase();
-    return selected.tracks.filter((t) => {
+    const result = selected.tracks.filter((t) => {
       if (artistFilter && t.artist !== artistFilter) return false;
       if (damagedOnly && t.status !== 'deleted' && t.status !== 'unavailable') return false;
       if (duplicatesOnly && !duplicateIds.has(t.id)) return false;
       if (q && !t.title.toLowerCase().includes(q) && !t.artist.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [selected, query, artistFilter, damagedOnly, duplicatesOnly, duplicateIds]);
+
+    if (sortKey !== 'none') {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      const field = sortKey === 'title' ? 'title' : 'artist';
+      result.sort((a, b) => {
+        const cmp = a[field].toLowerCase().localeCompare(b[field].toLowerCase());
+        return cmp * dir;
+      });
+    }
+    return result;
+  }, [selected, query, artistFilter, damagedOnly, duplicatesOnly, duplicateIds, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTracks.length / PAGE_SIZE));
   const pagedTracks = filteredTracks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -143,23 +170,33 @@ export default function Dashboard({ onLogout }: Props) {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  const importPlaylist = async () => {
-    if (!importUrl.trim()) {
+  const importPlaylist = async (url: string): Promise<boolean> => {
+    if (!url.trim()) {
       showToast('Ingresa la URL o ID de una playlist.');
-      return;
+      return false;
     }
     setImporting(true);
     try {
-      const res = await api.post<Playlist>('/api/playlists/import', { playlistUrl: importUrl.trim() });
+      const res = await api.post<Playlist>('/api/playlists/import', { playlistUrl: url.trim() });
       showToast(res.message ?? 'Playlist importada.');
-      setImportUrl('');
       await loadAll();
       setSelectedId(res.data?.id ?? null);
+      return true;
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Error al importar.');
+      return false;
     } finally {
       setImporting(false);
     }
+  };
+
+  const verifyDuplicates = () => {
+    const n = duplicateIds.size;
+    showToast(
+      n > 0
+        ? `Duplicados actualizados: ${n} canciones comparten el mismo título y artista.`
+        : 'No hay canciones duplicadas (mismo título y artista).',
+    );
   };
 
   const deletePlaylist = async (id: string) => {
@@ -402,39 +439,29 @@ export default function Dashboard({ onLogout }: Props) {
       />
 
       <main class="mx-auto max-w-6xl px-4 py-6">
-        <section class="mb-6 rounded-xl border border-surface-800 bg-surface-900 p-4">
-          <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
-            Importar playlist
-          </h2>
-          <div class="flex flex-col gap-2 sm:flex-row">
-            <input
-              value={importUrl}
-              onInput={(e) => setImportUrl((e.target as HTMLInputElement).value)}
-              onKeyDown={(e) => e.key === 'Enter' && void importPlaylist()}
-              placeholder="https://www.youtube.com/playlist?list=…  o  solo el ID"
-              class="flex-1 rounded-lg border border-surface-700 bg-surface-850 px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-            />
-            <button
-              onClick={() => void importPlaylist()}
-              disabled={importing}
-              class="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-60"
-            >
-              {importing ? 'Importando…' : 'Importar'}
-            </button>
-          </div>
-        </section>
-
         {playlists.length === 0 ? (
           <div class="rounded-xl border border-dashed border-surface-700 bg-surface-900/50 p-10 text-center text-gray-400">
             <p class="mb-1 text-lg font-medium text-gray-300">Aún no hay playlists</p>
-            <p class="text-sm">Importa tu primera playlist con el enlace o ID de YouTube.</p>
+            <p class="mb-4 text-sm">Importa tu primera playlist con el enlace o ID de YouTube.</p>
+            <button
+              onClick={() => setShowImport(true)}
+              class="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500"
+            >
+              Importar playlist
+            </button>
           </div>
         ) : (
           <>
             <section class="mb-6">
-              <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
-                Mis playlists
-              </h2>
+              <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400">Mis playlists</h2>
+                <button
+                  onClick={() => setShowImport(true)}
+                  class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
+                >
+                  Importar playlist
+                </button>
+              </div>
               <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {playlists.map((p) => (
                   <PlaylistCard
@@ -462,16 +489,24 @@ export default function Dashboard({ onLogout }: Props) {
                       onClick={() => void syncStructure()}
                       disabled={syncingStructure}
                       title="Detecta canciones nuevas añadidas directamente en YouTube y las importa sin pisar tus datos"
-                      class="rounded-lg border border-surface-700 bg-surface-800 px-4 py-2 text-sm font-medium text-gray-200 transition hover:bg-surface-700 disabled:opacity-60"
+                      class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
                     >
                       {syncingStructure ? 'Sincronizando…' : 'Sincronizar playlist'}
                     </button>
                     <button
                       onClick={() => void syncPlaylist(true)}
                       disabled={syncing}
-                      class="rounded-lg border border-surface-700 bg-surface-800 px-4 py-2 text-sm font-medium text-gray-200 transition hover:bg-surface-700 disabled:opacity-60"
+                      title="Revisa el estado (activa / eliminada / privada / no disponible) de todas las canciones guardadas"
+                      class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
                     >
                       {syncing ? 'Verificando…' : 'Verificar estados'}
+                    </button>
+                    <button
+                      onClick={verifyDuplicates}
+                      title="Revisa las canciones con el mismo título y artista (posibles duplicados reales)"
+                      class="rounded-lg border border-blue-600 bg-blue-600/20 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-600/30"
+                    >
+                      Verificar duplicados
                     </button>
                     {lostCount > 0 && (
                       <button
@@ -506,7 +541,7 @@ export default function Dashboard({ onLogout }: Props) {
                         type="checkbox"
                         checked={allVisibleSelected}
                         onChange={toggleSelectVisible}
-                        class="h-4 w-4 cursor-pointer accent-red-600"
+                        class="h-4 w-4 cursor-pointer accent-blue-600"
                       />
                       Seleccionar esta página ({pagedTracks.length})
                     </label>
@@ -520,13 +555,13 @@ export default function Dashboard({ onLogout }: Props) {
                           onInput={(e) => setBulkArtist((e.target as HTMLInputElement).value)}
                           onKeyDown={(e) => e.key === 'Enter' && void applyBulkArtist()}
                           placeholder="Nuevo artista para las seleccionadas…"
-                          class="min-w-0 flex-1 rounded-lg border border-surface-700 bg-surface-850 px-3 py-1.5 text-sm text-white placeholder-gray-500 outline-none focus:border-red-500"
+                          class="min-w-0 flex-1 rounded-lg border border-surface-700 bg-surface-850 px-3 py-1.5 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500"
                         />
                         <button
                           onClick={() => void applyBulkArtist()}
                           disabled={bulkSaving || !bulkArtist.trim()}
                           title="Unifica el artista de las canciones seleccionadas (útil para corregir variantes del mismo artista)"
-                          class="rounded-lg bg-red-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-60"
+                          class="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
                         >
                           {bulkSaving ? 'Aplicando…' : 'Aplicar artista'}
                         </button>
@@ -545,6 +580,9 @@ export default function Dashboard({ onLogout }: Props) {
                   tracks={pagedTracks}
                   selectedIds={selectedTrackIds}
                   duplicateIds={duplicateIds}
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onToggleSort={toggleSort}
                   onToggleSelect={toggleSelectTrack}
                   onRecover={(t) => setRecoveryTrack(t)}
                   onEdit={(t) => setEditingTrack(t)}
@@ -573,6 +611,14 @@ export default function Dashboard({ onLogout }: Props) {
           playlistId={selected.id}
           onClose={() => setEditingTrack(null)}
           onSaved={() => void handleTrackEdited()}
+        />
+      )}
+
+      {showImport && (
+        <ImportModal
+          importing={importing}
+          onImport={(url) => importPlaylist(url)}
+          onClose={() => setShowImport(false)}
         />
       )}
     </div>

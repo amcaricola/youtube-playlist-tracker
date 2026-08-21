@@ -11,6 +11,9 @@ interface Props {
   onDelete: () => void;
 }
 
+export const GRID_COLS =
+  'grid-cols-[2.25rem_4.5rem_minmax(0,1fr)_minmax(0,1fr)_10rem]';
+
 const STATUS_META: Record<TrackStatus, { label: string; classes: string }> = {
   active: { label: 'Activa', classes: 'bg-emerald-950/60 text-emerald-300' },
   unavailable: { label: 'No disponible', classes: 'bg-amber-950/60 text-amber-300' },
@@ -29,57 +32,70 @@ export default function TrackItem({ track, selected, isDuplicate, onToggleSelect
 
   return (
     <li
-      class={`group flex items-center gap-3 rounded-xl border p-3 transition ${
+      class={`group grid ${GRID_COLS} items-center gap-3 px-3 py-2 transition ${
         selected
-          ? 'border-red-600/60 bg-surface-850'
+          ? 'bg-blue-950/30'
           : damaged
-            ? 'border-red-900/50 bg-red-950/20 hover:bg-red-950/30'
-            : 'border-surface-800 bg-surface-900 hover:bg-surface-850'
+            ? 'bg-red-950/20 hover:bg-red-950/30'
+            : 'hover:bg-surface-850'
       }`}
     >
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={onToggleSelect}
-        title="Seleccionar para edición masiva"
-        class="h-4 w-4 shrink-0 cursor-pointer accent-red-600"
-      />
-      <div class="relative shrink-0">
+      <span
+        class={`relative inline-block h-4 w-4 shrink-0 transition ${
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          title="Seleccionar para edición masiva"
+          class="peer absolute inset-0 h-full w-full cursor-pointer appearance-none rounded border border-surface-600 bg-surface-800 transition hover:border-blue-500 checked:border-blue-500 checked:bg-blue-600"
+        />
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="pointer-events-none absolute inset-0 m-auto h-3 w-3 text-white opacity-0 transition peer-checked:opacity-100"
+        >
+          <path d="M3.5 8.5l3 3 6-6" />
+        </svg>
+      </span>
+
+      <div class="relative h-10 w-16 shrink-0">
         {track.thumbnailUrl ? (
           <img
             src={track.thumbnailUrl}
             alt=""
-            class="h-12 w-20 rounded-md object-cover"
+            class="h-10 w-16 rounded object-cover"
             loading="lazy"
           />
         ) : (
-          <div class="flex h-12 w-20 items-center justify-center rounded-md bg-surface-700 text-lg">🎵</div>
+          <div class="flex h-10 w-16 items-center justify-center rounded bg-surface-700 text-sm">🎵</div>
         )}
         <a
           href={watchUrl(track.youtubeVideoId)}
           target="_blank"
           rel="noopener noreferrer"
           title="Reproducir en YouTube"
-          class="absolute inset-0 flex items-center justify-center rounded-md bg-black/70 text-lg opacity-0 transition group-hover:opacity-100"
+          class="absolute inset-0 flex items-center justify-center rounded bg-black/70 text-base opacity-0 transition group-hover:opacity-100"
         >
           ▶
         </a>
       </div>
 
-      <div class="min-w-0 flex-1">
-        <p class="truncate text-sm font-semibold text-white">
-          {track.artist ? (
-            <>
-              <span class="text-gray-400">{track.artist}</span>
-              {' · '}
-            </>
-          ) : null}
-          {track.title}
-        </p>
-        {track.channelTitle ? <p class="truncate text-xs text-gray-500">{track.channelTitle}</p> : null}
-      </div>
+      <p class="min-w-0 truncate text-sm font-semibold text-white" title={track.title}>
+        {track.title}
+      </p>
 
-      <div class="flex shrink-0 flex-col items-end gap-2">
+      <p class="min-w-0 truncate text-sm text-gray-400" title={track.artist}>
+        {track.artist || '—'}
+      </p>
+
+      <div class="flex shrink-0 flex-col items-end gap-1.5">
         <div class="flex items-center gap-1.5">
           {isDuplicate && (
             <span
@@ -91,18 +107,18 @@ export default function TrackItem({ track, selected, isDuplicate, onToggleSelect
           )}
           <span class={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${meta.classes}`}>{meta.label}</span>
         </div>
-        <div class="flex gap-1.5">
+        <div class="flex items-center gap-1.5">
           <button
             onClick={onEdit}
             title="Editar artista / título"
-            class="rounded-lg border border-surface-700 bg-surface-800 px-2.5 py-1.5 text-xs font-medium text-gray-200 transition hover:bg-surface-700"
+            class="rounded-lg border border-surface-700 bg-surface-800 px-2.5 py-1.5 text-xs font-medium text-gray-200 opacity-0 transition hover:bg-surface-700 group-hover:opacity-100"
           >
             ✏️
           </button>
           {damaged && (
             <button
               onClick={onRecover}
-              class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-500"
+              class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"
             >
               Recuperar
             </button>

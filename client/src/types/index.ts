@@ -7,7 +7,6 @@ export interface Track {
   title: string;
   artist: string;
   originalYoutubeTitle: string;
-  channelTitle: string;
   thumbnailUrl: string;
   position: number;
   status: TrackStatus;

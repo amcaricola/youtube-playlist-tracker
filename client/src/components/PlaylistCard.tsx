@@ -22,7 +22,7 @@ export default function PlaylistCard({ playlist, active, onSelect, onDelete }: P
       onClick={onSelect}
       class={`group cursor-pointer rounded-xl border p-4 transition ${
         active
-          ? 'border-red-500/60 bg-surface-800'
+          ? 'border-blue-500/60 bg-surface-800'
           : 'border-surface-800 bg-surface-900 hover:border-surface-700 hover:bg-surface-850'
       }`}
     >

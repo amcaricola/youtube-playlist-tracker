@@ -40,7 +40,7 @@ export default function Pagination({ page, totalPages, onPage }: Props) {
             onClick={() => onPage(p)}
             class={`min-w-[2rem] rounded-lg px-2 py-1.5 text-sm transition ${
               p === page
-                ? 'bg-red-600 font-semibold text-white'
+                ? 'bg-blue-600 font-semibold text-white'
                 : 'border border-surface-700 bg-surface-900 text-gray-300 hover:bg-surface-800'
             }`}
           >

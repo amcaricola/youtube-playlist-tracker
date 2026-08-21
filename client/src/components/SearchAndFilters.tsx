@@ -51,7 +51,7 @@ function ArtistAutocomplete({
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="Filtrar por artista…"
-        class="w-full rounded-lg border border-surface-700 bg-surface-900 py-2 pl-3 pr-8 text-sm text-white placeholder-gray-500 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+        class="w-full rounded-lg border border-surface-700 bg-surface-900 py-2 pl-3 pr-8 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
       />
       {value && (
         <button
@@ -107,7 +107,7 @@ export default function SearchAndFilters({
             value={query}
             onInput={(e) => onQuery((e.target as HTMLInputElement).value)}
             placeholder="Buscar por canción o artista…"
-            class="w-full rounded-lg border border-surface-700 bg-surface-900 py-2 pl-9 pr-8 text-sm text-white placeholder-gray-500 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+            class="w-full rounded-lg border border-surface-700 bg-surface-900 py-2 pl-9 pr-8 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
           {query && (
             <button
@@ -126,7 +126,7 @@ export default function SearchAndFilters({
           onClick={() => onDamagedOnly(!damagedOnly)}
           class={`shrink-0 rounded-lg border px-3 py-2 text-sm font-medium transition ${
             damagedOnly
-              ? 'border-red-600 bg-red-600/20 text-red-300'
+              ? 'border-blue-500 bg-blue-500/20 text-blue-300'
               : 'border-surface-700 bg-surface-900 text-gray-300 hover:bg-surface-850'
           }`}
         >

@@ -15,7 +15,8 @@
     "build:server": "npm run build -w server",
     "build:client": "npm run build -w client",
     "start": "npm run start -w server",
-    "typecheck": "npm run typecheck -w server && npm run typecheck -w client"
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
+    "docker:start": "npm run build -w server && npm run build -w client && npm run start -w server "
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
