@@ -1,4 +1,4 @@
-import { isGenericPlaceholder } from './trackUtils';
+import { isDamaged, isGenericPlaceholder } from './trackUtils';
 import type { Track, TrackStatus } from '../types';
 
 interface Props {
@@ -20,6 +20,7 @@ const STATUS_META: Record<TrackStatus, { label: string; classes: string }> = {
   private: { label: 'Privada', classes: 'bg-purple-950/60 text-purple-300' },
   deleted: { label: 'Eliminada', classes: 'bg-red-950/60 text-red-300' },
   unknown: { label: 'Sin verificar', classes: 'bg-gray-800 text-gray-400' },
+  out_of_playlist: { label: 'Fuera de playlist', classes: 'bg-orange-950/60 text-orange-300' },
 };
 
 function watchUrl(videoId: string): string {
@@ -28,7 +29,8 @@ function watchUrl(videoId: string): string {
 
 export default function TrackItem({ track, selected, isDuplicate, onToggleSelect, onRecover, onEdit, onDelete }: Props) {
   const meta = STATUS_META[track.status] ?? STATUS_META.unknown;
-  const damaged = track.status === 'deleted' || track.status === 'unavailable';
+  const damaged = isDamaged(track.status);
+  const outOfPlaylist = track.status === 'out_of_playlist';
 
   return (
     <li
@@ -131,7 +133,16 @@ export default function TrackItem({ track, selected, isDuplicate, onToggleSelect
               Verificar
             </button>
           )}
-          {damaged && isGenericPlaceholder(track) && (
+          {outOfPlaylist && (
+            <button
+              onClick={onDelete}
+              title="Eliminar del registro local (ya no está en tu playlist de YouTube)"
+              class="rounded-lg border border-orange-900/50 bg-orange-950/40 px-2.5 py-1.5 text-xs font-medium text-orange-300 transition hover:bg-orange-950/70"
+            >
+              🗑
+            </button>
+          )}
+          {damaged && isGenericPlaceholder(track) && !outOfPlaylist && (
             <button
               onClick={onDelete}
               title="Eliminar de la playlist de YouTube (no se puede recuperar)"

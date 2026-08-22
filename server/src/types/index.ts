@@ -1,4 +1,4 @@
-export type TrackStatus = 'active' | 'unavailable' | 'private' | 'deleted' | 'unknown';
+export type TrackStatus = 'active' | 'unavailable' | 'private' | 'deleted' | 'unknown' | 'out_of_playlist';
 
 export interface Track {
   id: string;

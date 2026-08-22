@@ -113,7 +113,9 @@ export async function deletePlaylist(localId: string): Promise<void> {
   await storage.writePlaylists(file);
 }
 
-export async function syncStructure(localPlaylistId: string): Promise<{ added: number }> {
+export async function syncStructure(
+  localPlaylistId: string,
+): Promise<{ added: number; removed: number }> {
   const file = await storage.readPlaylists();
   const playlist = file.playlists.find((p) => p.id === localPlaylistId);
   if (!playlist) {
@@ -122,16 +124,41 @@ export async function syncStructure(localPlaylistId: string): Promise<{ added: n
 
   const items = await fetchPlaylistItems(playlist.youtubePlaylistId);
 
+  const itemsByItemId = new Map(items.map((i) => [i.playlistItemId, i]));
+  const itemsByVideoId = new Map(items.map((i) => [i.videoId, i]));
   const existingByItemId = new Map(playlist.tracks.map((t) => [t.youtubePlaylistItemId, t]));
   const newTracks: Track[] = [];
+  const now = new Date().toISOString();
 
   for (const item of items) {
     const existing = existingByItemId.get(item.playlistItemId);
     if (existing) {
       existing.position = item.position;
+      if (existing.status === 'out_of_playlist') {
+        existing.status = 'active';
+        existing.lastCheckedAt = now;
+      }
       continue;
     }
     newTracks.push(buildTrack(item));
+  }
+
+  let removed = 0;
+  for (const track of playlist.tracks) {
+    if (itemsByItemId.has(track.youtubePlaylistItemId)) continue;
+    const readded = track.youtubeVideoId ? itemsByVideoId.get(track.youtubeVideoId) : undefined;
+    if (readded) {
+      track.youtubePlaylistItemId = readded.playlistItemId;
+      track.position = readded.position;
+      track.status = 'active';
+      track.lastCheckedAt = now;
+      continue;
+    }
+    if (track.status !== 'out_of_playlist') {
+      track.status = 'out_of_playlist';
+      track.lastCheckedAt = now;
+      removed += 1;
+    }
   }
 
   playlist.tracks.push(...newTracks);
@@ -156,7 +183,7 @@ export async function syncStructure(localPlaylistId: string): Promise<{ added: n
     }
   }
 
-  return { added: newTracks.length };
+  return { added: newTracks.length, removed };
 }
 
 export async function refreshPlaylistStatus(
@@ -216,7 +243,7 @@ export async function replaceTrack(
   const position = insertAtSamePosition ? track.position : undefined;
   const newPlaylistItemId = await insertPlaylistItem(playlist.youtubePlaylistId, newVideoId, position);
 
-  if (track.youtubePlaylistItemId) {
+  if (track.youtubePlaylistItemId && track.status !== 'out_of_playlist') {
     await deletePlaylistItem(track.youtubePlaylistItemId).catch((err) => {
       console.error('[replace] No se pudo eliminar el item original:', err);
     });
@@ -331,7 +358,12 @@ export async function importBackup(raw: string): Promise<{ playlists: number; tr
 }
 
 function isDamaged(status: Track['status']): boolean {
-  return status === 'deleted' || status === 'unavailable';
+  return (
+    status === 'deleted' ||
+    status === 'unavailable' ||
+    status === 'private' ||
+    status === 'out_of_playlist'
+  );
 }
 
 const GENERIC_TITLES = [
@@ -350,7 +382,6 @@ export function isLostInfo(track: Pick<Track, 'title' | 'artist'>): boolean {
 }
 
 export async function removeTrackFromPlaylist(localPlaylistId: string, trackId: string): Promise<Track> {
-  await ensureOAuthConnected();
   const file = await storage.readPlaylists();
   const playlist = file.playlists.find((p) => p.id === localPlaylistId);
   if (!playlist) {
@@ -362,7 +393,8 @@ export async function removeTrackFromPlaylist(localPlaylistId: string, trackId: 
   }
   const [track] = playlist.tracks.splice(index, 1);
 
-  if (track.youtubePlaylistItemId) {
+  if (track.youtubePlaylistItemId && track.status !== 'out_of_playlist') {
+    await ensureOAuthConnected();
     try {
       await deletePlaylistItem(track.youtubePlaylistItemId);
     } catch (err) {
@@ -375,7 +407,6 @@ export async function removeTrackFromPlaylist(localPlaylistId: string, trackId: 
 }
 
 export async function removeDamagedTracks(localPlaylistId: string): Promise<number> {
-  await ensureOAuthConnected();
   const file = await storage.readPlaylists();
   const playlist = file.playlists.find((p) => p.id === localPlaylistId);
   if (!playlist) {
@@ -383,9 +414,14 @@ export async function removeDamagedTracks(localPlaylistId: string): Promise<numb
   }
 
   const lost = playlist.tracks.filter((t) => isDamaged(t.status) && isLostInfo(t));
+  const needsOAuth = lost.some((t) => t.status !== 'out_of_playlist' && t.youtubePlaylistItemId);
+  if (needsOAuth) {
+    await ensureOAuthConnected();
+  }
+
   let removed = 0;
   for (const track of lost) {
-    if (track.youtubePlaylistItemId) {
+    if (track.youtubePlaylistItemId && track.status !== 'out_of_playlist') {
       try {
         await deletePlaylistItem(track.youtubePlaylistItemId);
       } catch (err) {

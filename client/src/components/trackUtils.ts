@@ -14,7 +14,12 @@ export function isGenericPlaceholder(track: { title: string; artist: string }): 
 }
 
 export function isDamaged(status: string): boolean {
-  return status === 'deleted' || status === 'unavailable';
+  return (
+    status === 'deleted' ||
+    status === 'unavailable' ||
+    status === 'private' ||
+    status === 'out_of_playlist'
+  );
 }
 
 export function normalizeTitle(title: string): string {

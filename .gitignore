@@ -19,3 +19,4 @@ client/.env.local
 .env
 .env.*
 !.env.example
+secret

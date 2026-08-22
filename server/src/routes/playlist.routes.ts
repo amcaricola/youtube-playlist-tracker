@@ -90,13 +90,19 @@ playlistRoutes.delete('/:id', async (c) => {
 playlistRoutes.post('/:id/sync-structure', async (c) => {
   try {
     const result = await syncStructure(c.req.param('id'));
+    const parts: string[] = [];
+    if (result.added > 0) parts.push(`${result.added} canciones nuevas importadas.`);
+    if (result.removed > 0) {
+      parts.push(
+        `${result.removed} canciones ya no están en tu playlist de YouTube y se marcaron como "Fuera de playlist".`,
+      );
+    }
+    const message =
+      parts.length > 0 ? parts.join(' ') : 'La estructura está al día, no hay cambios.';
     return c.json({
       success: true,
       data: result,
-      message:
-        result.added > 0
-          ? `Estructura sincronizada: ${result.added} canciones nuevas importadas.`
-          : 'La estructura está al día, no hay canciones nuevas.',
+      message,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error al sincronizar la estructura.';

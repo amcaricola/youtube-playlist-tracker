@@ -6,6 +6,7 @@ import TrackList from '../components/TrackList';
 import RecoveryModal from '../components/RecoveryModal';
 import EditTrackModal from '../components/EditTrackModal';
 import ImportModal from '../components/ImportModal';
+import PlaylistManageModal from '../components/PlaylistManageModal';
 import Pagination from '../components/Pagination';
 import { api, clearAuth, getToken } from '../services/api';
 import { showToast } from '../components/Toaster';
@@ -38,10 +39,13 @@ export default function Dashboard({ onLogout }: Props) {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [recoveryTrack, setRecoveryTrack] = useState<Track | null>(null);
   const [editingTrack, setEditingTrack] = useState<Track | null>(null);
+  const [manageId, setManageId] = useState<string | null>(null);
+  const [deletingManage, setDeletingManage] = useState(false);
   const [oauth, setOauth] = useState<OAuthStatus | null>(null);
   const [session, setSession] = useState<SessionSummary | null>(null);
 
   const selected = playlists.find((p) => p.id === selectedId) ?? playlists[0] ?? null;
+  const managedPlaylist = playlists.find((p) => p.id === manageId) ?? null;
 
   const loadAll = async () => {
     const [pl, oa, ss] = await Promise.allSettled([
@@ -142,7 +146,7 @@ export default function Dashboard({ onLogout }: Props) {
     const q = query.trim().toLowerCase();
     const result = selected.tracks.filter((t) => {
       if (artistFilter && t.artist !== artistFilter) return false;
-      if (damagedOnly && t.status !== 'deleted' && t.status !== 'unavailable') return false;
+      if (damagedOnly && !isDamaged(t.status)) return false;
       if (duplicatesOnly && !duplicateIds.has(t.id)) return false;
       if (q && !t.title.toLowerCase().includes(q) && !t.artist.toLowerCase().includes(q)) return false;
       return true;
@@ -283,7 +287,11 @@ export default function Dashboard({ onLogout }: Props) {
 
   const deleteTrack = async (track: Track) => {
     if (!selected) return;
-    if (!window.confirm('¿Eliminar esta canción de tu playlist de YouTube y del registro local?')) return;
+    const confirmMsg =
+      track.status === 'out_of_playlist'
+        ? '¿Eliminar esta canción del registro local? Ya no está en tu playlist de YouTube.'
+        : '¿Eliminar esta canción de tu playlist de YouTube y del registro local?';
+    if (!window.confirm(confirmMsg)) return;
     try {
       const res = await api.delete(`/api/playlists/${selected.id}/tracks/${track.id}`);
       showToast(res.message ?? 'Canción eliminada.');
@@ -340,13 +348,28 @@ export default function Dashboard({ onLogout }: Props) {
     if (!selected) return;
     setSyncingStructure(true);
     try {
-      const res = await api.post<{ added: number }>(`/api/playlists/${selected.id}/sync-structure`);
+      const res = await api.post<{ added: number; removed: number }>(
+        `/api/playlists/${selected.id}/sync-structure`,
+      );
       showToast(res.message ?? 'Estructura sincronizada.');
       await loadAll();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Error al sincronizar la estructura.');
     } finally {
       setSyncingStructure(false);
+    }
+  };
+
+  const manageDelete = async () => {
+    if (!managedPlaylist) return;
+    setDeletingManage(true);
+    try {
+      await deletePlaylist(managedPlaylist.id);
+      setManageId(null);
+    } catch {
+      /* el toast ya se mostró en deletePlaylist */
+    } finally {
+      setDeletingManage(false);
     }
   };
 
@@ -470,6 +493,10 @@ export default function Dashboard({ onLogout }: Props) {
                     active={p.id === selected?.id}
                     onSelect={() => setSelectedId(p.id)}
                     onDelete={() => void deletePlaylist(p.id)}
+                    onManage={() => {
+                      setSelectedId(p.id);
+                      setManageId(p.id);
+                    }}
                   />
                 ))}
               </div>
@@ -485,22 +512,6 @@ export default function Dashboard({ onLogout }: Props) {
                     </p>
                   </div>
                   <div class="flex gap-2">
-                    <button
-                      onClick={() => void syncStructure()}
-                      disabled={syncingStructure}
-                      title="Detecta canciones nuevas añadidas directamente en YouTube y las importa sin pisar tus datos"
-                      class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
-                    >
-                      {syncingStructure ? 'Sincronizando…' : 'Sincronizar playlist'}
-                    </button>
-                    <button
-                      onClick={() => void syncPlaylist(true)}
-                      disabled={syncing}
-                      title="Revisa el estado (activa / eliminada / privada / no disponible) de todas las canciones guardadas"
-                      class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
-                    >
-                      {syncing ? 'Verificando…' : 'Verificar estados'}
-                    </button>
                     <button
                       onClick={verifyDuplicates}
                       title="Revisa las canciones con el mismo título y artista (posibles duplicados reales)"
@@ -609,8 +620,27 @@ export default function Dashboard({ onLogout }: Props) {
         <EditTrackModal
           track={editingTrack}
           playlistId={selected.id}
+          isDuplicate={duplicateIds.has(editingTrack.id)}
           onClose={() => setEditingTrack(null)}
           onSaved={() => void handleTrackEdited()}
+          onDeleted={() => {
+            showToast('Canción eliminada.');
+            setEditingTrack(null);
+            void loadAll();
+          }}
+        />
+      )}
+
+      {managedPlaylist && (
+        <PlaylistManageModal
+          playlist={managedPlaylist}
+          syncingStructure={syncingStructure}
+          syncing={syncing}
+          deleting={deletingManage}
+          onSyncStructure={() => void syncStructure()}
+          onVerifyStates={() => void syncPlaylist(true)}
+          onDelete={() => void manageDelete()}
+          onClose={() => setManageId(null)}
         />
       )}
 
