@@ -438,25 +438,45 @@ export async function insertPlaylistItem(
   videoId: string,
   position?: number,
 ): Promise<string> {
-  const body: Record<string, unknown> = {
-    snippet: {
-      playlistId,
-      resourceId: { kind: 'youtube#video', videoId },
-    },
+  const createBody = (pos?: number): Record<string, unknown> => {
+    const body: Record<string, unknown> = {
+      snippet: {
+        playlistId,
+        resourceId: { kind: 'youtube#video', videoId },
+      },
+    };
+    if (pos !== undefined && pos >= 0) {
+      (body.snippet as Record<string, unknown>).position = pos;
+    }
+    return body;
   };
-  if (position !== undefined && position >= 0) {
-    (body.snippet as Record<string, unknown>).position = position;
+
+  const perform = async (pos?: number): Promise<Response> => {
+    return fetch(`${API_BASE}/playlistItems?part=snippet`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${await getAccessToken()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(createBody(pos)),
+    });
+  };
+
+  const parse = async (res: Response): Promise<{ id?: string; error?: { message?: string } }> => {
+    return (await res.json()) as { id?: string; error?: { message?: string } };
+  };
+
+  let res = await perform(position);
+  let data = await parse(res);
+  if (
+    !res.ok &&
+    position !== undefined &&
+    (data.error?.message ?? '').toLowerCase().includes('manual sorting')
+  ) {
+    res = await perform();
+    data = await parse(res);
   }
 
-  const res = await fetch(`${API_BASE}/playlistItems?part=snippet`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${await getAccessToken()}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  const data = (await res.json()) as { id?: string; error?: { message?: string } };
   if (!res.ok || !data.id) {
     throw new YouTubeError(`Error al insertar el video: ${data.error?.message ?? res.status}`, res.status);
   }

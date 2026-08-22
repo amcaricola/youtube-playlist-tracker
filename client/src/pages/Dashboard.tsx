@@ -507,38 +507,38 @@ export default function Dashboard({ onLogout }: Props) {
                     </p>
                   </div>
                   <div class="flex gap-2">
-                    {damagedCount > 0 && (
-                      <div class="relative shrink-0">
-                        <button
-                          onClick={() => setDamagedOnly(!damagedOnly)}
-                          title={`${damagedCount} canciones dañadas en esta playlist`}
-                          class={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                            damagedOnly
-                              ? 'border-blue-500 bg-blue-500/20 text-blue-300'
-                              : 'border-surface-700 bg-surface-900 text-gray-300 hover:bg-surface-850'
-                          }`}
-                        >
-                          {damagedOnly ? '✓ ' : ''}Solo dañadas
-                        </button>
+                    <div class="relative shrink-0">
+                      <button
+                        onClick={() => setDamagedOnly(!damagedOnly)}
+                        title={damagedCount > 0 ? `${damagedCount} canciones dañadas en esta playlist` : 'Filtrar solo canciones dañadas'}
+                        class={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                          damagedOnly
+                            ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+                            : 'border-surface-700 bg-surface-900 text-gray-300 hover:bg-surface-850'
+                        }`}
+                      >
+                        {damagedOnly ? '✓ ' : ''}Solo dañadas
+                      </button>
+                      {damagedCount > 0 && (
                         <span class="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-surface-950" />
-                      </div>
-                    )}
-                    {duplicateIds.size > 0 && (
-                      <div class="relative shrink-0">
-                        <button
-                          onClick={() => setDuplicatesOnly(!duplicatesOnly)}
-                          title={`${duplicateIds.size} canciones duplicadas en esta playlist`}
-                          class={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                            duplicatesOnly
-                              ? 'border-orange-500 bg-orange-500/20 text-orange-300'
-                              : 'border-surface-700 bg-surface-900 text-gray-300 hover:bg-surface-850'
-                          }`}
-                        >
-                          {duplicatesOnly ? '✓ ' : ''}Solo duplicadas
-                        </button>
+                      )}
+                    </div>
+                    <div class="relative shrink-0">
+                      <button
+                        onClick={() => setDuplicatesOnly(!duplicatesOnly)}
+                        title={duplicateIds.size > 0 ? `${duplicateIds.size} canciones duplicadas en esta playlist` : 'Filtrar solo canciones duplicadas'}
+                        class={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                          duplicatesOnly
+                            ? 'border-orange-500 bg-orange-500/20 text-orange-300'
+                            : 'border-surface-700 bg-surface-900 text-gray-300 hover:bg-surface-850'
+                        }`}
+                      >
+                        {duplicatesOnly ? '✓ ' : ''}Solo duplicadas
+                      </button>
+                      {duplicateIds.size > 0 && (
                         <span class="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-surface-950" />
-                      </div>
-                    )}
+                      )}
+                    </div>
                     {lostCount > 0 && (
                       <button
                         onClick={() => void removeDamaged()}
