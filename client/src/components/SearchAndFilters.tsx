@@ -41,7 +41,10 @@ function ArtistAutocomplete({
       <input
         value={input}
         onInput={(e) => {
-          setInput((e.target as HTMLInputElement).value);
+          const next = (e.target as HTMLInputElement).value;
+          setInput(next);
+          // Escribir una nueva búsqueda no debe dejar activo el artista anterior.
+          if (next !== value) onChange('');
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}

@@ -13,7 +13,7 @@ import { showToast } from '../components/Toaster';
 import { isDamaged, isGenericPlaceholder, normalizeTitle } from '../components/trackUtils';
 import type { OAuthStatus, Playlist, SessionSummary, Track } from '../types';
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 interface Props {
   onLogout: () => void;
@@ -234,14 +234,21 @@ export default function Dashboard({ onLogout }: Props) {
   };
 
   const openOAuth = async () => {
+    // Abrir la ventana antes del await evita que el navegador la bloquee.
+    const popup = window.open('', 'youtube-oauth', 'width=540,height=680');
     try {
       const res = await api.get<{ url: string }>('/api/youtube/oauth/url');
-      if (!res.data) return;
-      const popup = window.open(res.data.url, 'youtube-oauth', 'width=540,height=680');
+      if (!res.data) {
+        popup?.close();
+        return;
+      }
       if (!popup) {
         window.location.href = res.data.url;
+      } else {
+        popup.location.href = res.data.url;
       }
     } catch (err) {
+      popup?.close();
       showToast(err instanceof Error ? err.message : 'No se pudo iniciar OAuth.');
     }
   };

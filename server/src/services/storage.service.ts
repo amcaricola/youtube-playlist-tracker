@@ -33,26 +33,31 @@ function ensureDataDir(): void {
   }
 }
 
-async function readJson<T>(name: string, fallback: T): Promise<T> {
+async function readJson<T>(name: string, fallback: () => T): Promise<T> {
   const fp = filePath(name);
   ensureDataDir();
   if (!fs.existsSync(fp)) {
-    return fallback;
+    return fallback();
   }
   try {
     const raw = await fs.promises.readFile(fp, 'utf-8');
     return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
+  } catch (err) {
+    throw new StorageError(
+      `No se pudo leer ${name}: ${err instanceof SyntaxError ? 'el JSON está corrupto.' : 'error de lectura.'}`,
+    );
   }
 }
 
 async function writeJsonAtomic(name: string, data: unknown): Promise<void> {
+  await writeTextAtomic(name, JSON.stringify(data, null, 2));
+}
+
+async function writeTextAtomic(name: string, content: string): Promise<void> {
   ensureDataDir();
   const fp = filePath(name);
   const tmp = path.join(config.dataDir, `${name}.${process.pid}.${Date.now()}.tmp`);
-  const serialized = JSON.stringify(data, null, 2);
-  await fs.promises.writeFile(tmp, serialized, 'utf-8');
+  await fs.promises.writeFile(tmp, content, 'utf-8');
   await fs.promises.rename(tmp, fp);
 }
 
@@ -62,17 +67,47 @@ function enqueue<T>(operation: () => Promise<T>): Promise<T> {
   return result;
 }
 
+async function updateJson<T>(name: string, fallback: () => T, update: (data: T) => T | Promise<T>): Promise<T> {
+  return enqueue(async () => {
+    const current = await readJson(name, fallback);
+    const next = await update(current);
+    await writeJsonAtomic(name, next);
+    return next;
+  });
+}
+
 export const storage = {
   readConfig(): Promise<ConfigFile> {
-    return readJson<ConfigFile>(config.files.config, EMPTY_CONFIG);
+    return readJson<ConfigFile>(config.files.config, () => structuredClone(EMPTY_CONFIG));
   },
 
   readSessions(): Promise<SessionsFile> {
-    return readJson<SessionsFile>(config.files.sessions, EMPTY_SESSIONS);
+    return readJson<SessionsFile>(config.files.sessions, () => structuredClone(EMPTY_SESSIONS));
   },
 
   readPlaylists(): Promise<PlaylistsFile> {
-    return readJson<PlaylistsFile>(config.files.playlists, EMPTY_PLAYLISTS);
+    return readJson<PlaylistsFile>(config.files.playlists, () => structuredClone(EMPTY_PLAYLISTS));
+  },
+
+  updateConfig(update: (data: ConfigFile) => ConfigFile | Promise<ConfigFile>): Promise<ConfigFile> {
+    return updateJson(config.files.config, () => structuredClone(EMPTY_CONFIG), update);
+  },
+
+  updateSessions(update: (data: SessionsFile) => SessionsFile | Promise<SessionsFile>): Promise<SessionsFile> {
+    return updateJson(config.files.sessions, () => structuredClone(EMPTY_SESSIONS), update);
+  },
+
+  updatePlaylists(update: (data: PlaylistsFile) => PlaylistsFile | Promise<PlaylistsFile>): Promise<PlaylistsFile> {
+    return updateJson(config.files.playlists, () => structuredClone(EMPTY_PLAYLISTS), update);
+  },
+
+  async replacePlaylistsWithBackup(data: PlaylistsFile): Promise<void> {
+    await enqueue(async () => {
+      const current = await readJson<PlaylistsFile>(config.files.playlists, () => structuredClone(EMPTY_PLAYLISTS));
+      const backupName = `playlists.json.bak-${Date.now()}`;
+      await writeTextAtomic(backupName, JSON.stringify(current, null, 2));
+      await writeJsonAtomic(config.files.playlists, data);
+    });
   },
 
   writeConfig(data: ConfigFile): Promise<void> {
@@ -88,8 +123,6 @@ export const storage = {
   },
 
   async backupFile(name: string, content: string): Promise<void> {
-    ensureDataDir();
-    const fp = path.join(config.dataDir, name);
-    await fs.promises.writeFile(fp, content, 'utf-8');
+    await enqueue(() => writeTextAtomic(name, content));
   },
 };

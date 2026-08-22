@@ -23,8 +23,10 @@ export async function hashPassword(password: string, salt: Buffer): Promise<stri
 export async function verifyMasterPassword(password: string): Promise<boolean> {
   const cfg = await storage.readConfig();
   if (!cfg.masterPasswordHash || !cfg.salt) return false;
+  if (!/^[a-f0-9]+$/i.test(cfg.masterPasswordHash) || !/^[a-f0-9]+$/i.test(cfg.salt)) return false;
   const expected = Buffer.from(cfg.masterPasswordHash, 'hex');
   const salt = Buffer.from(cfg.salt, 'hex');
+  if (expected.length !== SCRYPT_KEYLEN || salt.length === 0) return false;
   const candidate = await deriveKey(password, salt);
   return crypto.timingSafeEqual(expected, candidate);
 }
@@ -65,7 +67,6 @@ export async function createSession(
   userAgent?: string,
   ip?: string,
 ): Promise<AuthResponse> {
-  const file = await storage.readSessions();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + config.sessionTtlDays * 24 * 60 * 60 * 1000);
 
@@ -78,9 +79,11 @@ export async function createSession(
     ip,
   };
 
-  const active = purgeExpired(file.sessions);
-  active.push(session);
-  await storage.writeSessions({ sessions: active });
+  await storage.updateSessions((file) => {
+    const active = purgeExpired(file.sessions);
+    active.push(session);
+    return { sessions: active };
+  });
 
   return { token, expiresAt: expiresAt.toISOString() };
 }
@@ -94,17 +97,18 @@ export async function validateToken(token: string | undefined): Promise<boolean>
 }
 
 export async function revokeToken(token: string): Promise<void> {
-  const file = await storage.readSessions();
   const tokenHash = hashToken(token);
-  await storage.writeSessions({
+  await storage.updateSessions((file) => ({
     sessions: file.sessions.filter((s) => s.tokenHash !== tokenHash),
-  });
+  }));
 }
 
 export async function blockAllSessions(): Promise<number> {
-  const file = await storage.readSessions();
-  const revoked = file.sessions.length;
-  await storage.writeSessions({ sessions: [] });
+  let revoked = 0;
+  await storage.updateSessions((file) => {
+    revoked = purgeExpired(file.sessions).length;
+    return { sessions: [] };
+  });
   return revoked;
 }
 

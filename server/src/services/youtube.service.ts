@@ -57,16 +57,17 @@ async function getAccessToken(): Promise<string> {
   if (!res.ok || !data.access_token) {
     throw new YouTubeError(`No se pudo refrescar el token de YouTube: ${data.error_description ?? data.error ?? res.status}`, 401);
   }
+  const accessToken = data.access_token;
 
   const expiresAt = new Date(Date.now() + (data.expires_in ?? 3600) * 1000).toISOString();
-  await storage.writeConfig({
-    ...cfg,
+  await storage.updateConfig((current) => ({
+    ...current,
     oauth: {
-      ...oauth,
-      accessToken: data.access_token,
+      ...current.oauth,
+      accessToken,
       expiresAt,
     },
-  });
+  }));
   return data.access_token;
 }
 
@@ -109,7 +110,12 @@ async function apiFetch(
     Object.assign(headers, await getReadHeaders());
   }
   const res = await fetch(url, { headers });
-  const json = (await res.json()) as ApiResponseJson & Record<string, unknown>;
+  let json: ApiResponseJson & Record<string, unknown>;
+  try {
+    json = (await res.json()) as ApiResponseJson & Record<string, unknown>;
+  } catch {
+    throw new YouTubeError(`Respuesta no válida de la API de YouTube (${res.status})`, res.status);
+  }
   if (!res.ok && !json.items) {
     const msg = json.error?.message ?? `Error de la API de YouTube (${res.status})`;
     throw new YouTubeError(msg, res.status);
@@ -158,20 +164,20 @@ export async function exchangeCode(code: string): Promise<{ channelId: string | 
   if (!res.ok || !data.access_token) {
     throw new YouTubeError(`Error en OAuth: ${data.error_description ?? data.error ?? res.status}`);
   }
+  const accessToken = data.access_token;
 
-  const channel = await fetchChannelInfo(data.access_token);
-  const cfg = await storage.readConfig();
-  await storage.writeConfig({
+  const channel = await fetchChannelInfo(accessToken);
+  await storage.updateConfig((cfg) => ({
     ...cfg,
     oauth: {
       connected: true,
-      accessToken: data.access_token,
+      accessToken,
       refreshToken: data.refresh_token ?? cfg.oauth.refreshToken,
       expiresAt: new Date(Date.now() + (data.expires_in ?? 3600) * 1000).toISOString(),
       channelId: channel.channelId,
       channelTitle: channel.channelTitle,
     },
-  });
+  }));
   return channel;
 }
 
@@ -220,8 +226,8 @@ export async function disconnectOAuth(): Promise<void> {
     }
   }
 
-  await storage.writeConfig({
-    ...cfg,
+  await storage.updateConfig((current) => ({
+    ...current,
     oauth: {
       connected: false,
       accessToken: null,
@@ -230,7 +236,7 @@ export async function disconnectOAuth(): Promise<void> {
       channelId: null,
       channelTitle: null,
     },
-  });
+  }));
 }
 
 export async function ensureOAuthConnected(): Promise<void> {
@@ -321,8 +327,10 @@ export async function fetchPlaylistItems(playlistId: string): Promise<
         channelTitle?: string;
         resourceId?: { videoId?: string };
       };
+      contentDetails?: { videoId?: string };
     }>) ?? []) {
-      const videoId = raw.snippet?.resourceId?.videoId;
+      // Algunos items dañados no traen resourceId en snippet, pero sí en contentDetails.
+      const videoId = raw.snippet?.resourceId?.videoId ?? raw.contentDetails?.videoId;
       if (!videoId) continue;
       items.push({
         playlistItemId: raw.id ?? '',

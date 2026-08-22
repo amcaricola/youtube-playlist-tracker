@@ -11,11 +11,11 @@ export function tracksDueForCheck(playlists: Playlist[], now = new Date()): Trac
   for (const playlist of playlists) {
     for (const track of playlist.tracks) {
       if (!track.lastCheckedAt) {
-        due.push(track);
+        if (track.status !== 'out_of_playlist') due.push(track);
         continue;
       }
       const last = new Date(track.lastCheckedAt).getTime();
-      if (last <= cutoff) due.push(track);
+      if (last <= cutoff && track.status !== 'out_of_playlist') due.push(track);
     }
   }
   return due;
@@ -33,26 +33,27 @@ export async function syncDueTracks(force = false): Promise<{ checked: number; u
   if (!force && dueIds.size === 0) return { checked: 0, updated: 0 };
 
   const videoIds = force
-    ? Array.from(new Set(file.playlists.flatMap((p) => p.tracks.map((t) => t.youtubeVideoId))))
-    : Array.from(dueIds);
+    ? Array.from(new Set(file.playlists.flatMap((p) => p.tracks.map((t) => t.youtubeVideoId).filter(Boolean))))
+    : Array.from(dueIds).filter(Boolean);
 
   const results = await checkVideosStatus(videoIds);
 
   let updated = 0;
-  for (const playlist of file.playlists) {
-    for (const track of playlist.tracks) {
-      if (!force && !dueIds.has(track.youtubeVideoId)) continue;
-      const check = results.get(track.youtubeVideoId);
-      if (!check) continue;
-      if (check.status !== track.status) {
-        track.status = check.status;
-        updated += 1;
+  await storage.updatePlaylists((current) => {
+    for (const playlist of current.playlists) {
+      for (const track of playlist.tracks) {
+        if (track.status === 'out_of_playlist' || (!force && !dueIds.has(track.youtubeVideoId))) continue;
+        const check = results.get(track.youtubeVideoId);
+        if (!check) continue;
+        if (check.status !== track.status) {
+          track.status = check.status;
+          updated += 1;
+        }
+        track.lastCheckedAt = now.toISOString();
       }
-      track.lastCheckedAt = now.toISOString();
     }
-  }
-
-  await storage.writePlaylists(file);
+    return current;
+  });
   return { checked: videoIds.length, updated };
 }
 

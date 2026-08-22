@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import crypto from 'node:crypto';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { requireAuth } from '../middleware/auth.js';
+import { config } from '../config.js';
 import {
   disconnectOAuth,
   exchangeCode,
@@ -21,7 +23,8 @@ function pruneStates(): void {
   }
 }
 
-function oauthCompleteHtml(status: string): string {
+function oauthCompleteHtml(status: 'error' | 'invalid' | 'connected' | 'failed'): string {
+  const targetOrigin = JSON.stringify(config.clientUrl);
   return (
     '<!doctype html><html lang="es"><head><meta charset="utf-8">' +
     '<title>YouTube OAuth</title></head><body style="background:#0a0a0f;color:#d1d5db;font-family:system-ui;' +
@@ -30,7 +33,7 @@ function oauthCompleteHtml(status: string): string {
     '. Puedes cerrar esta ventana.</p>' +
     '<script>if(window.opener){window.opener.postMessage({type:"YPT_OAUTH",status:"' +
     status +
-    '"}, "*");}window.close();</script></body></html>'
+    '"},' + targetOrigin + ');}</script></body></html>'
   );
 }
 
@@ -48,6 +51,7 @@ youtubeRoutes.get('/oauth/callback', async (c) => {
   const error = c.req.query('error');
 
   if (error || !code) {
+    if (state) pendingStates.delete(state);
     return c.html(oauthCompleteHtml('error'));
   }
   if (!state || !pendingStates.has(state)) {
@@ -84,7 +88,9 @@ youtubeRoutes.get('/search', requireAuth, async (c) => {
     return c.json({ success: true, data: results });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error al buscar en YouTube.';
-    return c.json({ success: false, error: message }, 500);
+    const rawStatus = err instanceof Error && 'statusCode' in err ? Number((err as { statusCode: unknown }).statusCode) : 500;
+    const statusCode = (rawStatus >= 400 && rawStatus <= 599 ? rawStatus : 500) as ContentfulStatusCode;
+    return c.json({ success: false, error: message }, statusCode);
   }
 });
 
