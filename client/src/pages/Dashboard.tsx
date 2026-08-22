@@ -194,15 +194,6 @@ export default function Dashboard({ onLogout }: Props) {
     }
   };
 
-  const verifyDuplicates = () => {
-    const n = duplicateIds.size;
-    showToast(
-      n > 0
-        ? `Duplicados actualizados: ${n} canciones comparten el mismo título y artista.`
-        : 'No hay canciones duplicadas (mismo título y artista).',
-    );
-  };
-
   const deletePlaylist = async (id: string) => {
     if (!window.confirm('¿Eliminar esta playlist de la app? (no se toca tu playlist en YouTube)')) return;
     try {
@@ -276,6 +267,11 @@ export default function Dashboard({ onLogout }: Props) {
     setEditingTrack(null);
     await loadAll();
   };
+
+  const damagedCount = useMemo(
+    () => (selected ? selected.tracks.filter((t) => isDamaged(t.status)).length : 0),
+    [selected],
+  );
 
   const lostCount = useMemo(
     () =>
@@ -492,7 +488,6 @@ export default function Dashboard({ onLogout }: Props) {
                     playlist={p}
                     active={p.id === selected?.id}
                     onSelect={() => setSelectedId(p.id)}
-                    onDelete={() => void deletePlaylist(p.id)}
                     onManage={() => {
                       setSelectedId(p.id);
                       setManageId(p.id);
@@ -512,13 +507,38 @@ export default function Dashboard({ onLogout }: Props) {
                     </p>
                   </div>
                   <div class="flex gap-2">
-                    <button
-                      onClick={verifyDuplicates}
-                      title="Revisa las canciones con el mismo título y artista (posibles duplicados reales)"
-                      class="rounded-lg border border-blue-600 bg-blue-600/20 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-600/30"
-                    >
-                      Verificar duplicados
-                    </button>
+                    {damagedCount > 0 && (
+                      <div class="relative shrink-0">
+                        <button
+                          onClick={() => setDamagedOnly(!damagedOnly)}
+                          title={`${damagedCount} canciones dañadas en esta playlist`}
+                          class={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                            damagedOnly
+                              ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+                              : 'border-surface-700 bg-surface-900 text-gray-300 hover:bg-surface-850'
+                          }`}
+                        >
+                          {damagedOnly ? '✓ ' : ''}Solo dañadas
+                        </button>
+                        <span class="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-surface-950" />
+                      </div>
+                    )}
+                    {duplicateIds.size > 0 && (
+                      <div class="relative shrink-0">
+                        <button
+                          onClick={() => setDuplicatesOnly(!duplicatesOnly)}
+                          title={`${duplicateIds.size} canciones duplicadas en esta playlist`}
+                          class={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                            duplicatesOnly
+                              ? 'border-orange-500 bg-orange-500/20 text-orange-300'
+                              : 'border-surface-700 bg-surface-900 text-gray-300 hover:bg-surface-850'
+                          }`}
+                        >
+                          {duplicatesOnly ? '✓ ' : ''}Solo duplicadas
+                        </button>
+                        <span class="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-surface-950" />
+                      </div>
+                    )}
                     {lostCount > 0 && (
                       <button
                         onClick={() => void removeDamaged()}
@@ -537,10 +557,6 @@ export default function Dashboard({ onLogout }: Props) {
                   artists={artists}
                   artistFilter={artistFilter}
                   onArtistFilter={setArtistFilter}
-                  damagedOnly={damagedOnly}
-                  onDamagedOnly={setDamagedOnly}
-                  duplicatesOnly={duplicatesOnly}
-                  onDuplicatesOnly={setDuplicatesOnly}
                   total={selected.tracks.length}
                   shown={filteredTracks.length}
                 />

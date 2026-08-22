@@ -4,7 +4,6 @@ interface Props {
   playlist: Playlist;
   active: boolean;
   onSelect: () => void;
-  onDelete: () => void;
   onManage: () => void;
 }
 
@@ -16,7 +15,7 @@ function playlistUrl(playlist: Playlist): string {
   return `https://www.youtube.com/playlist?list=${playlist.youtubePlaylistId}`;
 }
 
-export default function PlaylistCard({ playlist, active, onSelect, onDelete, onManage }: Props) {
+export default function PlaylistCard({ playlist, active, onSelect, onManage }: Props) {
   const activeCount = countByStatus(playlist, 'active');
   const damaged = countByStatus(playlist, 'deleted') + countByStatus(playlist, 'unavailable');
   const privateCount = countByStatus(playlist, 'private');
@@ -57,8 +56,8 @@ export default function PlaylistCard({ playlist, active, onSelect, onDelete, onM
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            title="Reproducir playlist en YouTube"
-            class="rounded-lg border border-surface-700 bg-surface-800 p-1.5 text-gray-300 transition hover:bg-surface-700 hover:text-white"
+            title="Ir a la playlist en YouTube"
+            class="rounded-lg bg-blue-600 p-2 text-white shadow transition hover:bg-blue-500"
           >
             <svg
               viewBox="0 0 24 24"
@@ -69,9 +68,8 @@ export default function PlaylistCard({ playlist, active, onSelect, onDelete, onM
               stroke-linejoin="round"
               class="h-4 w-4"
             >
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-              <polyline points="16 6 12 2 8 6" />
-              <line x1="12" y1="2" x2="12" y2="15" />
+              <circle cx="12" cy="12" r="10" />
+              <polygon points="10 8 16 12 10 16 10 8" />
             </svg>
           </a>
           <button
@@ -94,16 +92,6 @@ export default function PlaylistCard({ playlist, active, onSelect, onDelete, onM
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            title="Eliminar de la app"
-            class="rounded p-1 text-gray-500 opacity-0 transition hover:bg-surface-700 hover:text-red-400 group-hover:opacity-100"
-          >
-            ✕
           </button>
         </div>
       </div>

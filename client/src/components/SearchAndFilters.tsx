@@ -6,10 +6,6 @@ interface Props {
   artists: string[];
   artistFilter: string;
   onArtistFilter: (a: string) => void;
-  damagedOnly: boolean;
-  onDamagedOnly: (v: boolean) => void;
-  duplicatesOnly: boolean;
-  onDuplicatesOnly: (v: boolean) => void;
   total: number;
   shown: number;
 }
@@ -91,10 +87,6 @@ export default function SearchAndFilters({
   artists,
   artistFilter,
   onArtistFilter,
-  damagedOnly,
-  onDamagedOnly,
-  duplicatesOnly,
-  onDuplicatesOnly,
   total,
   shown,
 }: Props) {
@@ -121,28 +113,6 @@ export default function SearchAndFilters({
         </div>
 
         <ArtistAutocomplete artists={artists} value={artistFilter} onChange={onArtistFilter} />
-
-        <button
-          onClick={() => onDamagedOnly(!damagedOnly)}
-          class={`shrink-0 rounded-lg border px-3 py-2 text-sm font-medium transition ${
-            damagedOnly
-              ? 'border-blue-500 bg-blue-500/20 text-blue-300'
-              : 'border-surface-700 bg-surface-900 text-gray-300 hover:bg-surface-850'
-          }`}
-        >
-          {damagedOnly ? '✓ ' : ''}Solo dañadas
-        </button>
-
-        <button
-          onClick={() => onDuplicatesOnly(!duplicatesOnly)}
-          class={`shrink-0 rounded-lg border px-3 py-2 text-sm font-medium transition ${
-            duplicatesOnly
-              ? 'border-orange-500 bg-orange-500/20 text-orange-300'
-              : 'border-surface-700 bg-surface-900 text-gray-300 hover:bg-surface-850'
-          }`}
-        >
-          {duplicatesOnly ? '✓ ' : ''}Solo duplicadas
-        </button>
       </div>
 
       <div class="text-xs text-gray-500">
